@@ -1,0 +1,53 @@
+@import "tailwindcss";
+
+@variant dark (&:is(.dark *));
+
+html,
+body,
+#root {
+  transition-property: background-color, color, border-color, fill, stroke;
+  transition-duration: 500ms;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  body,
+  #root {
+    transition: none;
+  }
+}
+
+body {
+  background-color: #121212;
+  color: #E0E0E0;
+  -webkit-tap-highlight-color: transparent;
+  scroll-behavior: smooth;
+}
+
+@keyframes emeraldPulse {
+  0%,
+  100% {
+    border-color: #2A2A2A;
+    box-shadow: 0 0 0 rgba(52, 211, 153, 0);
+  }
+  50% {
+    border-color: #10b981;
+    box-shadow: 0 0 15px rgba(52, 211, 153, 0.3);
+  }
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+input[type=number] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
