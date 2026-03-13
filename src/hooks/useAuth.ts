@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../services/supabaseClient';
 import { signIn, signUp, signOut, getProfile, createNewCoupleGroup, joinCoupleGroup } from '../services/authService';
 import type { CoupleSession, UserProfile } from '../types/auth';
@@ -10,6 +10,9 @@ export const useAuth = () => {
   const [sessionData, setSessionData] = useState<CoupleSession | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  
+  const profileRef = useRef<UserProfile | null>(null);
+  const userRef = useRef<User | null>(null);
 
   const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
     let timeoutHandle: number | null = null;
@@ -83,6 +86,7 @@ export const useAuth = () => {
           console.log('[useAuth] calling getProfile...');
           const userProfile = await withTimeout(getProfile(currentUser.id), PROFILE_TIMEOUT, 'getProfile');
           console.log('[useAuth] getProfile resolved');
+          profileRef.current = userProfile;
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
         } else {
@@ -115,10 +119,11 @@ export const useAuth = () => {
       console.log('[useAuth] onAuthStateChange event:', event, 'isHidden:', document.hidden);
       if (event === 'SIGNED_IN' && supabaseSession?.user) {
         console.log('[useAuth] SIGNED_IN, userId:', supabaseSession.user.id);
+        userRef.current = supabaseSession.user;
         setUser(supabaseSession.user);
         
-        if (profile && profile.id === supabaseSession.user.id) {
-          console.log('[useAuth] SIGNED_IN but profile already exists, skipping reload');
+        if (profileRef.current && profileRef.current.id === supabaseSession.user.id) {
+          console.log('[useAuth] SIGNED_IN but profile already exists (via ref), skipping reload');
           setError(null);
           return;
         }
@@ -132,6 +137,7 @@ export const useAuth = () => {
           console.log('[useAuth] calling getProfile after SIGNED_IN...');
           const userProfile = await withTimeout(getProfile(supabaseSession.user.id), PROFILE_TIMEOUT, 'getProfile');
           console.log('[useAuth] getProfile resolved after SIGNED_IN');
+          profileRef.current = userProfile;
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
           setError(null);
@@ -159,6 +165,8 @@ export const useAuth = () => {
 
       if (event === 'SIGNED_OUT') {
         console.log('[useAuth] SIGNED_OUT');
+        userRef.current = null;
+        profileRef.current = null;
         setUser(null);
         setProfile(null);
         setSessionData(null);
@@ -184,6 +192,7 @@ export const useAuth = () => {
       withTimeout(getProfile(user.id), PROFILE_TIMEOUT, 'getProfile')
         .then((userProfile) => {
           console.log('[useAuth] getProfile on visibility resolved');
+          profileRef.current = userProfile;
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
           setError(null);
