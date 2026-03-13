@@ -25,6 +25,9 @@ export const useAuth = () => {
     }
   };
 
+  const INIT_TIMEOUT = 15000;
+  const PROFILE_TIMEOUT = 15000;
+
   const isInvalidAuthState = (err: unknown): boolean => {
     const message = err instanceof Error ? err.message : '';
     const lower = message.toLowerCase();
@@ -58,21 +61,28 @@ export const useAuth = () => {
   useEffect(() => {
     const initAuth = async () => {
       try {
+        console.log('[useAuth] initAuth START, isHidden:', document.hidden);
         setIsLoading(true);
-        const { data, error: sessionError } = await withTimeout(supabase.auth.getSession(), 8000, 'supabase.getSession');
+        console.log('[useAuth] calling getSession...');
+        const { data, error: sessionError } = await withTimeout(supabase.auth.getSession(), INIT_TIMEOUT, 'supabase.getSession');
+        console.log('[useAuth] getSession resolved, error:', sessionError);
         if (sessionError) throw sessionError;
 
         const currentUser = data.session?.user ?? null;
+        console.log('[useAuth] currentUser:', currentUser?.id ?? 'null');
         setUser(currentUser);
 
         if (currentUser) {
           if (document.hidden) {
+            console.log('[useAuth] tab hidden, skipping profile fetch');
             setProfile(null);
             setSessionData(null);
             return;
           }
 
-          const userProfile = await withTimeout(getProfile(currentUser.id), 8000, 'getProfile');
+          console.log('[useAuth] calling getProfile...');
+          const userProfile = await withTimeout(getProfile(currentUser.id), PROFILE_TIMEOUT, 'getProfile');
+          console.log('[useAuth] getProfile resolved');
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
         } else {
@@ -80,7 +90,7 @@ export const useAuth = () => {
           setSessionData(null);
         }
       } catch (err) {
-        console.error('Auth initialization error:', err);
+        console.error('[useAuth] initAuth ERROR:', err);
         setError(mapAuthErrorToSpanish(err));
         if (isInvalidAuthState(err)) {
           try {
@@ -93,27 +103,42 @@ export const useAuth = () => {
         setProfile(null);
         setSessionData(null);
       } finally {
+        console.log('[useAuth] initAuth FINALLY, setting isLoading=false');
         setIsLoading(false);
       }
     };
 
+    console.log('[useAuth] useEffect mount, calling initAuth');
     initAuth();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(async (event, supabaseSession) => {
+      console.log('[useAuth] onAuthStateChange event:', event, 'isHidden:', document.hidden);
       if (event === 'SIGNED_IN' && supabaseSession?.user) {
+        console.log('[useAuth] SIGNED_IN, userId:', supabaseSession.user.id);
         setUser(supabaseSession.user);
+        
+        if (profile && profile.id === supabaseSession.user.id) {
+          console.log('[useAuth] SIGNED_IN but profile already exists, skipping reload');
+          setError(null);
+          return;
+        }
+        
         setIsLoading(true);
         try {
           if (document.hidden) {
+            console.log('[useAuth] tab hidden during SIGNED_IN, skipping profile');
             return;
           }
-          const userProfile = await withTimeout(getProfile(supabaseSession.user.id), 8000, 'getProfile');
+          console.log('[useAuth] calling getProfile after SIGNED_IN...');
+          const userProfile = await withTimeout(getProfile(supabaseSession.user.id), PROFILE_TIMEOUT, 'getProfile');
+          console.log('[useAuth] getProfile resolved after SIGNED_IN');
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
           setError(null);
         } catch (err) {
-          console.error('Error fetching profile:', err);
-          setError(mapAuthErrorToSpanish(err));
+          console.error('[useAuth] Error fetching profile after SIGNED_IN:', err);
+          const errMsg = mapAuthErrorToSpanish(err);
+          console.log('[useAuth] Preserving existing profile despite error');
           if (isInvalidAuthState(err)) {
             try {
               await supabase.auth.signOut();
@@ -121,16 +146,19 @@ export const useAuth = () => {
               // no-op
             }
             setUser(null);
+            setProfile(null);
+            setSessionData(null);
+            setError(errMsg);
           }
-          setProfile(null);
-          setSessionData(null);
         } finally {
+          console.log('[useAuth] SIGNED_IN FINALLY, setting isLoading=false');
           setIsLoading(false);
         }
         return;
       }
 
       if (event === 'SIGNED_OUT') {
+        console.log('[useAuth] SIGNED_OUT');
         setUser(null);
         setProfile(null);
         setSessionData(null);
@@ -146,22 +174,26 @@ export const useAuth = () => {
 
   useEffect(() => {
     const handleVisibility = () => {
+      console.log('[useAuth] visibilitychange, hidden:', document.hidden, 'user:', user?.id ?? 'null', 'profile:', !!profile);
       if (document.hidden) return;
       if (!user) return;
       if (profile) return;
 
+      console.log('[useAuth] tab visible, user exists, no profile - fetching...');
       setIsLoading(true);
-      withTimeout(getProfile(user.id), 8000, 'getProfile')
+      withTimeout(getProfile(user.id), PROFILE_TIMEOUT, 'getProfile')
         .then((userProfile) => {
+          console.log('[useAuth] getProfile on visibility resolved');
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
           setError(null);
         })
         .catch((err) => {
-          console.error('Error fetching profile on focus:', err);
+          console.error('[useAuth] Error fetching profile on visibility:', err);
           setError(mapAuthErrorToSpanish(err));
         })
         .finally(() => {
+          console.log('[useAuth] visibility fetch FINALLY, setting isLoading=false');
           setIsLoading(false);
         });
     };
