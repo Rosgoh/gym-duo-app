@@ -36,7 +36,7 @@ export default defineConfig({
           },
           {
             src: 'ms-icon-310x310.png',
-            sizes: '512x512',
+            sizes: '310x310',
             type: 'image/png',
             purpose: 'any',
           },
