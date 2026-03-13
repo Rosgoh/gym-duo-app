@@ -114,6 +114,11 @@ export const useWorkoutLogs = ({
             }
             return out;
           } catch {
+            try {
+              window.localStorage.removeItem(duoLocalKey);
+            } catch {
+              // ignore
+            }
             return {};
           }
         })();
@@ -325,6 +330,11 @@ export const useWorkoutLogs = ({
         return true;
       } catch (err) {
         console.error('[useWorkoutLogs] Failed to save duo weight locally:', err);
+        try {
+          window.localStorage.removeItem(duoLocalKey);
+        } catch {
+          // ignore
+        }
         setSaveErrorDuoByExerciseId((prev) => ({ ...prev, [activeId]: true }));
         return false;
       } finally {
