@@ -13,7 +13,7 @@ interface WorkoutLogRow {
   exercise_id: string;
   user_id: string;
   couple_id: string;
-  weight: number;
+  weight_used: number;
 }
 
 interface ExerciseStatusRow {
@@ -31,7 +31,7 @@ export const saveWeight = async ({ exerciseId, weight, userId, coupleId }: SaveW
       exercise_id: exerciseId,
       user_id: userId,
       couple_id: coupleId,
-      weight,
+      weight_used: weight,
     })
     .select('*')
     .single();
@@ -53,7 +53,7 @@ export const getLastWeight = async ({
 }): Promise<number | null> => {
   const { data, error } = await supabase
     .from('workout_logs')
-    .select('weight')
+    .select('weight_used')
     .eq('exercise_id', exerciseId)
     .eq('user_id', userId)
     .eq('couple_id', coupleId)
@@ -64,7 +64,7 @@ export const getLastWeight = async ({
   if (error) throw error;
   if (!data) return null;
 
-  const w = (data as { weight: number | null }).weight;
+  const w = (data as { weight_used: number | null }).weight_used;
   return typeof w === 'number' ? w : null;
 };
 
@@ -81,7 +81,7 @@ export const getLastWeightsForExercise = async ({
 }): Promise<{ you: number | null; duo: number | null }> => {
   const { data, error } = await supabase
     .from('workout_logs')
-    .select('user_id, weight, created_at')
+    .select('user_id, weight_used, created_at')
     .eq('exercise_id', exerciseId)
     .eq('couple_id', coupleId)
     .order('created_at', { ascending: false })
@@ -89,23 +89,23 @@ export const getLastWeightsForExercise = async ({
 
   if (error) throw error;
 
-  const rows = (data ?? []) as Array<{ user_id: string; weight: number; created_at: string }>;
+  const rows = (data ?? []) as Array<{ user_id: string; weight_used: number; created_at: string }>;
 
   let you: number | null = null;
   let duo: number | null = null;
 
   for (const row of rows) {
     if (row.user_id === currentUserId) {
-      if (you === null) you = row.weight;
+      if (you === null) you = row.weight_used;
       continue;
     }
 
     if (partnerUserId) {
       if (row.user_id === partnerUserId) {
-        if (duo === null) duo = row.weight;
+        if (duo === null) duo = row.weight_used;
       }
     } else {
-      if (duo === null) duo = row.weight;
+      if (duo === null) duo = row.weight_used;
     }
 
     if (you !== null && duo !== null) break;
