@@ -1,0 +1,18 @@
+{
+  "short_name": "PowerDuo",
+  "name": "POWER DUO: Industrial Training",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/10996/10996831.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#121212",
+  "display": "standalone",
+  "scope": "/",
+  "theme_color": "#FF8C00",
+  "description": "Sistema de entrenamiento dual para Roger y Paty."
+}
