@@ -11,6 +11,20 @@ export const useAuth = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const withTimeout = async <T,>(promise: Promise<T>, timeoutMs: number, label: string): Promise<T> => {
+    let timeoutHandle: number | null = null;
+    try {
+      const timeoutPromise = new Promise<T>((_, reject) => {
+        timeoutHandle = window.setTimeout(() => {
+          reject(new Error(`${label} timeout`));
+        }, timeoutMs);
+      });
+      return await Promise.race([promise, timeoutPromise]);
+    } finally {
+      if (timeoutHandle !== null) window.clearTimeout(timeoutHandle);
+    }
+  };
+
   const isInvalidAuthState = (err: unknown): boolean => {
     const message = err instanceof Error ? err.message : '';
     const lower = message.toLowerCase();
@@ -45,14 +59,20 @@ export const useAuth = () => {
     const initAuth = async () => {
       try {
         setIsLoading(true);
-        const { data, error: sessionError } = await supabase.auth.getSession();
+        const { data, error: sessionError } = await withTimeout(supabase.auth.getSession(), 8000, 'supabase.getSession');
         if (sessionError) throw sessionError;
 
         const currentUser = data.session?.user ?? null;
         setUser(currentUser);
 
         if (currentUser) {
-          const userProfile = await getProfile(currentUser.id);
+          if (document.hidden) {
+            setProfile(null);
+            setSessionData(null);
+            return;
+          }
+
+          const userProfile = await withTimeout(getProfile(currentUser.id), 8000, 'getProfile');
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
         } else {
@@ -84,7 +104,10 @@ export const useAuth = () => {
         setUser(supabaseSession.user);
         setIsLoading(true);
         try {
-          const userProfile = await getProfile(supabaseSession.user.id);
+          if (document.hidden) {
+            return;
+          }
+          const userProfile = await withTimeout(getProfile(supabaseSession.user.id), 8000, 'getProfile');
           setProfile(userProfile);
           setSessionData(extractSessionData(userProfile));
           setError(null);
@@ -120,6 +143,34 @@ export const useAuth = () => {
       authListener.subscription.unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    const handleVisibility = () => {
+      if (document.hidden) return;
+      if (!user) return;
+      if (profile) return;
+
+      setIsLoading(true);
+      withTimeout(getProfile(user.id), 8000, 'getProfile')
+        .then((userProfile) => {
+          setProfile(userProfile);
+          setSessionData(extractSessionData(userProfile));
+          setError(null);
+        })
+        .catch((err) => {
+          console.error('Error fetching profile on focus:', err);
+          setError(mapAuthErrorToSpanish(err));
+        })
+        .finally(() => {
+          setIsLoading(false);
+        });
+    };
+
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [user, profile]);
 
   useEffect(() => {
     const coupleSessionId = profile?.couple_id;
